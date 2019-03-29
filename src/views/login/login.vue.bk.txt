@@ -1,0 +1,691 @@
+<template lang="html">
+ <div class="index-content" :style="{'height':height+'px'}">
+    <div class="logo"></div>
+     <div class="wrap">
+         <div class="login_box">
+            <div class="login_box_contain">
+              <div class="head-title"> 
+                <span @click="loginStyle(1)" :class="{'active':isUsernameP}" class="box-title ">{{$t('message.AccountLogin')}}</span> 
+                <span @click="loginStyle(2)" :class="{'active':!isUsernameP}"  class="box-title pding-left-30">{{$t('message.SMSLogin')}}</span>
+              </div>
+              <div v-if="isUsernameP" class="login-input-box">
+                <div  class="contrl-input-datas">
+                  <input class="form-control login-input username"  type="text" :placeholder="$t('placeholder.textAccount')" v-model="userName" :maxlength="maxLength30" autocomplete="on">
+                  <i  icon="el-icon-error"  @click="clearFn('userName')"></i>
+                </div>
+                 <div  class="contrl-input-datas">
+                   <input class="form-control login-input passwords" :placeholder="$t('placeholder.texpsd')" type="password" 
+                     v-model="userPwd" :maxlength="maxLength30" autocomplete="off">
+                    <i icon="el-icon-error" @click="clearFn('userPwd')"></i>
+                </div>
+              </div>
+              <div v-if="!isUsernameP"  class="login-input-box">
+                <div class="contrl-input-datas">
+                   <input class="form-control login-input phone" :placeholder="$t('placeholder.textel')" v-model="userPhone" :maxlength="maxLength11" autocomplete="off">
+                   <i icon="el-icon-error" @click="clearFn('userPhone')"></i>
+                </div>
+                <div>
+                <div  class="contrl-input-datas">
+                  
+                  <!-- <input class="form-control login-input valitor" :placeholder="$t('placeholder.textVerCode')" type="text" @keyup="userValitor=userValitor.replace(/[^\d]/g,'')" 
+                       v-model="userValitor" :maxlengt="maxLength4" min="0"> -->
+                       <input class="form-control login-input valitor" :placeholder="$t('placeholder.textVerCode')" type="text" 
+                       v-model="userValitor" :maxlengt="maxLength4" min="0" autocomplete="off">
+                      <template v-if="isSendingVal==false">
+                           <span  class="timer"  @click="sendValiter"  >
+                              {{timmer}}
+                           </span>
+                      </template>
+                      <template  v-if="isSendingVal==true">
+                           <span  class="timer">
+                              {{timmer}}
+                           </span>
+                      </template>
+                </div>
+                </div>
+              </div>
+              <template  v-if="isUsernameP">
+                <input type="button" class="login-button" @click="login_in()" :value="$t('message.loginbtn')" :disabled="!userName || !userPwd">
+              </template>
+              <template  v-if="!isUsernameP">
+                <input type="button" class="login-button" @click="login_in()" :value="$t('message.loginbtn')"  :disabled="!userPhone || !userValitor">
+              </template>
+               <!-- <div class="setting-language">
+                 <div class="has-selected-languge">
+                   <span>{{selectedLanguge.name}}</span>
+                   <em></em> 
+                   <ul class="language-lists" ref="languageLists">
+                    <li  @click="reverseMessage(item)" v-for="(item,index) in langugeList" :key="index" :title="item.name">
+                      {{item.name}}
+                      </li>
+                   </ul>
+                 </div>
+                 
+               </div> -->
+            </div>
+         </div>
+     </div>
+     </div>
+</template>
+
+<script>
+   /* eslint-disable */
+  import types from '../../store/mutation-types'
+  import * as api from "../../api"
+  import  auth from '../../utils/auth'
+  import * as sysApi from '../../services/sys'
+  import {mapGetters, mapActions, mapMutations} from 'vuex'
+  import {checkPhone} from '../../utils/utils'
+  import {maxLength,maxLength30,maxLength11,maxLength4, headers,headerAppX,langugeList,selectedLanguge} from '../../config/config'
+  export default {
+    name: 'login',
+    data() {
+      return {
+        activeName: 'first',
+        num: 1,
+        userName:"",
+        userPwd:"",
+        userValitor:"",
+        userPhone:"",
+        Authorization:"",
+        isUsernameP:true,
+        timmer:this.$t('message.getCode'),
+        isSendingVal:false,
+        maxLength11:maxLength11,
+        maxLength4:maxLength4,
+        maxLength30:maxLength30,
+        countdown:60,
+        height:0,
+        langugeList:langugeList,
+        selectedLanguge:selectedLanguge
+      }
+    },
+    components: {},
+    created() {
+      this.getHeight()
+    },
+    mounted(){
+      this.getLocalLang();
+    },
+    methods: {
+      ...mapMutations({
+        setUserInfo: types.SET_USER_INFO
+      }),
+      ...mapActions({
+        load: 'loadMenuList' // 映射 this.load() 为 this.$store.dispatch('loadMenuList')
+      }),
+    loginSuccess({sid,user,redirectUrl}){
+        auth.login(sid);
+        window.sessionStorage.setItem("user-info", JSON.stringify(user));
+        this.setUserInfo(user);
+        
+        this.$http.defaults.headers.common['Authorization'] = "Bearer "+sid;
+        //获取用户权限
+        sysApi.getUses().then((res)=>{
+          if(!!res){
+            window.localStorage.setItem("userAuth",JSON.stringify(res.result))
+          }
+        }).then(()=>{
+          this.load();
+          //this.$store.dispatch('loadMenuList')
+          if(redirectUrl === "/"){
+              redirectUrl="/index";
+          }
+          redirectUrl && this.$router.push({path: redirectUrl});
+        })
+      },
+    handleClick(tab, event) {
+        console.log(tab, event);
+    },
+    clearFn(item){
+      this[item]="";
+    },
+    loginStyle(type){
+      if(type===2){
+        this.isUsernameP=false
+      }else{
+        this.isUsernameP=true
+      }
+    },
+    reverseMessage: function (item) {
+      this.$i18n.locale = item.shortName;
+      let saveLang = JSON.stringify(item);
+      localStorage.setItem("i18n",saveLang);
+      this.langugeList.forEach((lang)=>{
+        if(lang.id===item.id){
+          this.selectedLanguge = item;
+        }
+      })
+      this.$refs.languageLists.style.display="none";
+      setTimeout(()=>{
+        this.$refs.languageLists.style.display="";
+      },1000)
+
+    },
+    getLocalLang(){
+      if(localStorage){
+        let hasI18n = localStorage.getItem("i18n");
+        if(!!hasI18n){
+          let i18nData = JSON.parse(hasI18n);
+           this.$i18n.locale = i18nData.shortName;
+           this.selectedLanguge = i18nData
+        }else{
+          this.selectedLanguge = this.selectedLanguge;
+          this.$i18n.locale = this.selectedLanguge.shortName;
+        }
+      }
+      
+      
+    },
+    TestVux: function () {
+      console.log('TestVux')
+    },
+    tab(index) {
+        this.num = index;
+    },
+    getHeight() {
+       var _this = this
+       this.height =  window.innerHeight;
+       window.onresize = function(){
+          _this.height =  window.innerHeight;
+       }
+    },
+    login_in(){
+        //debugger
+      if (this.$route.query && this.$route.query != null && this.$route.query.redirect && this.$route.query.redirect != null) {
+          redirectUrl = this.$route.query.redirect;
+      } 
+      var _this = this;
+      var params = {
+          parameter1:this.userName,
+          parameter2:this.userPwd,
+      };
+      let data = {};
+      if(this.isUsernameP){
+        data={
+          parameter1:this.userName,
+          parameter2:this.userPwd,
+          loginType:1
+        }
+      }else{
+        data={
+          parameter1:this.userPhone,
+          parameter2:this.userValitor,
+          loginType:2
+        }
+      }
+      
+        if(this.form.parameter1===""){
+          this.$message.error("用户名不能为空！")
+          return false
+        }
+        if(this.form.parameter1.length<6){
+          this.$message.error("用户名不能小于6位数！")
+          return false
+        }
+        if(this.form.parameter1.length>25){
+          this.$message.error("用户名不能大于25位数！")
+          return false
+        }
+        if(this.form.parameter2===""){
+          this.$message.error("密码不能为空！")
+          return false
+        }
+        if(this.form.parameter2.length<6){
+          this.$message.error("密码不能小于6位数！")
+          return false
+        }
+        if(this.form.parameter2.length>25){
+          this.$message.error("密码不能大于25位数！")
+          return false
+        }
+
+       
+
+
+
+
+      this.$http.post(api.LOGIN,data).then((res)=>{
+          if(res.data.result.code===200){
+            let resNew = res.data.result.tokenResultMsg;
+            let sid = resNew.access_token;
+            let tempExpires = resNew.expires_in;
+            let tokenType = resNew.token_type;
+            let user={
+              name:data.parameter1,
+              tempExpires:tempExpires,
+              tokenType:tokenType
+            };
+            let objNew = {sid,user}
+            this.loginSuccess({...objNew,redirectUrl})
+            this.$message.success(res.data.result.message);
+          }else{
+            let resNew = res.data.result.message||"信息错误";
+            this.$message.error(resNew);
+          }
+          
+        },(err)=>{
+          console.log(err);
+        }).catch((err)=>{
+          console.log(err);
+        })
+
+    },
+
+    // forgetPWD(){
+    //   this.$router.push("/retrievePassword")
+    // },
+    //发送短信验证码
+    sendValiter(){
+      let valiter = checkPhone(this.userPhone);
+      if(!valiter.isRight){
+          if(this.$i18n.locale==="cn"){
+            this.$message.error(valiter.cNmessage);
+          }else if(this.$i18n.locale==="en"){
+            this.$message.error(valiter.eNmessage);
+          }
+          return false;
+      }
+
+      if(!this.isSendingVal){
+          this.sendingValFn()
+      }else{
+          //this.$message.warning("短信已发送请注意查收");
+      }
+    },
+    sendingValFn(){
+        
+        this.$http.get(api.SEND_MASSEAGE,{params:{
+            phoneNumber:this.userPhone
+          }
+        }).then((res)=>{
+         console.log(res);
+         if(!!res.data.result.status){
+            this.settime();
+            this.$message.success(res.data.result.message);
+         }else{
+           this.$message.error(res.data.result.message);
+         }
+        }).catch((err)=>{
+          console.log(err);
+        })
+     
+
+    },
+    settime(){
+      let t = null
+        if(this.countdown == 0) {
+            clearTimeout(t);
+            this.isSendingVal = false;
+            this.timmer = this.$t('message.getCode')
+            this.countdown = 60;
+        }else{
+            this.isSendingVal = true;
+            this.timmer = this.$t('message.getCodeAgain') +"("+ this.countdown+"S)"
+            //this.timmer="重新发送(" + this.countdown + ")";
+            this.countdown--;
+            t = setTimeout(()=>{
+               this.settime();
+            },1000)
+        }
+     }
+    }
+  }
+</script>
+
+<style scoped>
+h1, h2 {
+  font-weight: normal;
+}
+ul {
+  list-style-type: none;
+  padding: 0;
+}
+li {
+  display: inline-block;
+  margin: 0 10px;
+}
+a {
+  color: #42b983;
+}
+.index-content{
+   width: 100%;
+   height: 600px;
+   background: url("../../../static/img/bg-news.jpg") no-repeat center center;
+   /* background-size: 100% 100%; */
+   background-size: cover;
+}
+.index-content .logo{
+  position: absolute;
+  top: 4%;
+  left: 2%;
+  z-index: 100;
+  background: url('../../../static/img/bg-logo.jpg');
+  height: 44px;
+  width: 150px;
+  background-repeat: no-repeat;
+  background-size:100% 100%; 
+}
+.login_box{
+    position: absolute;
+    top: 0px;
+    right: 0px;
+    z-index: 102;
+    width: 380px;
+    height: 100%;
+    background: rgba(215, 218, 224, 0.6);
+    top: 0px;
+    right: 0%;
+}
+.tab-items{
+  width: 100%;
+  height: 46px;
+  display: flex;
+  position: relative;
+}
+.tab-items li{
+  flex:1;
+  display: flex;
+  justify-content: center;;
+  align-items: center;
+  margin: 0;
+  background: #eee;
+}
+.active{
+  background:rgba(255,255,255,0)!important; 
+}
+#app-5{
+  position: absolute;
+  left: 0px;
+  bottom: 20px;
+  color: rgba(114, 120, 120, 0.6);
+  font-size: 12px;
+  margin-left: 15%;
+  cursor: pointer;
+}
+#app-5 span:hover{
+  color: rgba(114, 120, 120,1)
+}
+.form_cont{
+  width: 70%;
+  margin-left: 15%;
+}
+.item_btn{
+  float: right;
+  margin-top:8px;
+  font-size: 12px;
+  height: 20px;
+  line-height: 20px;
+  vertical-align: middle;
+}
+.contrl-input-datas{
+  width: 268px;
+  position:relative;
+  margin-top: 20px;
+  margin-left: 56px;
+}
+.form-control.login-input{
+  width:268px;
+  height:48px;
+  padding-left:45px;
+  padding-right:15px;
+  font-size:14px;
+  /* border-radius:4px; */
+  border-radius: 24px;
+  border: 1px solid #eee;
+  padding-top:0;
+  padding-bottom:0;  
+}
+.contrl-input-datas .form-control.login-input + i[icon="el-icon-error"]{
+  display: none;
+}
+.contrl-input-datas .form-control.login-input:focus + i[icon="el-icon-error"]{
+  display: none;
+}
+.contrl-input-datas .form-control.login-input{
+  background-color: rgba(255,255,255,0.7)
+}
+.form-control.login-input:focus,
+.form-control.login-input:link,
+.form-control.login-input:hover,
+.form-control.login-input:active{
+  outline: 0;
+  background-color: #fff;
+}
+.form-control.login-input:focus{
+ border: 1px solid rgba(23, 150, 221, 1); 
+}
+.form_cont_box{
+  position: relative;
+}
+.icon-passwords,.icon-username{
+    background-repeat: no-repeat;
+    background-size:23px  25px; 
+    width: 23px;
+    height: 25px;
+    top: 29px;
+    position: absolute;
+    left: 5px;
+}
+.passwords,.username{
+  background-repeat: no-repeat;
+  background-position: 15px 12px;
+  background-size: 20px 20px;
+}
+.valitor,.phone{
+   background-repeat: no-repeat;
+  background-position: 15px 12px;
+  background-size: 18px 22px;
+}
+.username{
+    background-image: url("../../../static/img/username.png"); 
+}
+.passwords{
+  background-image: url("../../../static/img/password.png");
+}
+
+.phone{
+  background-image: url("../../../static/img/phone.png");
+  
+}
+.valitor{
+  background-image: url("../../../static/img/ver.png");
+  vertical-align: middle;
+}
+.login-button{
+  width: 268px;
+  margin-top:10px;
+  border: none;
+  height:50px;
+  font-size:18px;
+  cursor:pointer;
+  background-color: rgba(241, 0,0, 0.8);
+  border-radius:25px;
+  color:#fff;
+  margin-left: 54px;
+  display: block;
+}
+.login-button:hover{
+  background-color: rgba(241, 0, 37,1);
+}
+.login-button:disabled{
+  background-color: rgba(247, 75, 75,0.8);
+}
+.margin-left-20{
+  margin-left: 20px;
+}
+.width-60{
+  width: 60px;
+}
+.width-60.active{
+  color:#1796DD
+}
+.width-60.cn{
+  margin-right:15px;
+}
+.border-color-727878{
+  border-bottom:1px solid rgba(114,120,120,1);
+}
+.border-color-727878:hover{
+  color:#1796DD;
+}
+
+.login-input-box{
+  height:140px;
+  position:relative;
+}
+.login-input-box:after{
+  clear:both;
+  position:absolute;
+  content: '';
+}
+.box-title{
+  font-size:16px;
+  color:#000;
+  cursor:pointer;
+  text-align: center;
+}
+.box-title.active{
+  color:#1796DD;
+  position:relative;
+}
+.box-title.active:after{
+    height: 2px;
+    content: "";
+    width: 100%;
+    position: absolute;
+    left: 0;
+    bottom: -5px;
+    z-index: 1000;
+    background: #1796DD;
+}
+.head-title{
+  height:30px;
+  border-bottom: 2px solid #fff;
+}
+.box-title{
+  float:left;
+  height: 26px;
+      width: 50%;
+}
+.box-title.pding-left-30{
+  float:right;
+  text-align:center;
+}
+.form-control.login-input.valitor{
+  width:190px;
+}
+.timer{
+  width: 70px;
+  height: 48px;
+  outline:0;
+  background:rgba(0,0,0,0);
+  border-radius:4px;
+  cursor:pointer;
+  display: inline-block;
+  line-height: 50px;
+  text-align: center;
+  border-radius: 35px;
+  background-color: rgba(255,255,255,0.7);
+}
+
+.timer:link,.timer:visited,.timer:hover,.timer:focus{
+  background: #FFF;
+}
+
+.contrl-input-datas i[icon="el-icon-error"]{
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background-color: rgba(0,0,0,0);
+    right: 0;
+    top: 14px;
+    right: 10px;
+    background-image:url('../../../static/img/close-circle-o.png');
+    background-repeat:no-repeat;
+    background-size:100% 100%;
+    cursor:pointer;
+}
+.contrl-input-datas i[icon="el-icon-error"]:hover{
+  background-image:url('../../../static/img/close-circle-o-hover.png');
+}
+.forget-pwd{
+    text-align: right;
+    margin-top: 10px;
+    color:#1796DD;
+    cursor:pointer;
+}
+.setting-language{
+    height: 39px;
+    width: 300px;
+    font-size: 12px;
+    margin: 0 auto;
+    color: #FFF;
+    border-radius: 0;
+    zoom: 1;
+    display: block;
+    padding-left: 5px;
+    background: rgba(114, 120, 120, 0.6);
+    line-height: 39px;
+    margin-top: 30px;
+    position: relative;
+}
+
+.login_box_contain{
+  position: relative;
+  top: 50%;
+  margin-top: -200px;
+}
+.has-selected-languge{
+  cursor: pointer;
+  position: absolute;
+  width: 100px;
+  bottom: 0;
+  right: 0;
+  text-align: right;
+}
+
+.language-lists{
+  position: absolute;
+  display: none;
+  width: 100px;
+  background: #fff;
+  color: #000;
+  bottom: 10px;
+  overflow: hidden;
+  padding: 1px;
+  margin: 0;
+  text-align: left;
+
+}
+.has-selected-languge:hover>.language-lists{
+  display: block;
+  overflow: hidden;
+}
+.language-lists li{
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  height: 24px;
+  line-height: 24px;
+  margin-left: 1px;
+  margin-right: 1px;
+  display: block;
+  padding-left: 5px;
+}
+.language-lists li:hover{
+  color: #fff;
+  background: #5093E1;
+}
+.has-selected-languge>em{
+    display: inline-block;
+    vertical-align: middle;
+    height: 16px;
+    width: 16px;
+    line-height: 16px;
+    background: url('../../../static/img/control_icon.png') no-repeat;
+    background-position: 0 0;
+    margin-right: 5px;
+    margin-top: -5px;
+}
+</style>
